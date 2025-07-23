@@ -30,9 +30,10 @@ export class AuthService {
     // Создаем пользователя в БД
     const user = await this.prisma.user.create({
       data: {
+        firstname: dto.firstname,
+        lastname: dto.lastname,
         email: dto.email,
         password: hash,
-        username: dto.username,
       },
     });
 
@@ -42,7 +43,6 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        username: user.username,
       },
     };
   }

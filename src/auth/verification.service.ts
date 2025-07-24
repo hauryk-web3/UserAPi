@@ -1,12 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
 import Redis from 'ioredis';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
 export class VerificationService {
   constructor(
     private readonly mailerService: MailerService,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
+    private prisma: PrismaService,
   ) {}
 
   async sendVerificationCode(email: string) {
@@ -16,8 +18,12 @@ export class VerificationService {
 
     await this.mailerService.sendMail({
       to: email,
+      template: 'confirm',
       subject: 'Your Verification Code',
       text: `Your verification code is: ${code}`,
+      context: {
+        code: code,
+      },
     });
   }
 

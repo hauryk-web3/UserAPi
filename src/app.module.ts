@@ -11,6 +11,9 @@ import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
 
 import { join } from 'path';
+
+console.log(join(__dirname, '..', '/src/templates'));
+
 @Module({
   imports: [
     UsersModule,
@@ -18,18 +21,18 @@ import { join } from 'path';
     RedisModule,
     MailerModule.forRoot({
       transport: {
-        host: 'smtp.ethereal.email', // или smtp.gmail.com
+        host: 'smtp.ethereal.email',
         port: 587,
         auth: {
-          user: 'your_user@ethereal.email',
-          pass: 'your_password',
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
         },
       },
       defaults: {
         from: '"No Reply" <no-reply@example.com>',
       },
       template: {
-        dir: join(__dirname, 'templates'),
+        dir: join(__dirname, '..', '/src/templates'),
         adapter: new HandlebarsAdapter(),
         options: {
           strict: true,

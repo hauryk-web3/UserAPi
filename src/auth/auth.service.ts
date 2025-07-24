@@ -5,12 +5,14 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
+import { VerificationService } from './verification.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private readonly verificationService: VerificationService,
   ) {}
 
   // Регистрация
@@ -37,6 +39,8 @@ export class AuthService {
       },
     });
 
+    await this.verificationService.sendVerificationCode(dto.email);
+
     // Возвращаем минимум данных
     return {
       message: 'User created',
@@ -56,6 +60,10 @@ export class AuthService {
 
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (!user.emailVerified) {
+      throw new UnauthorizedException('Email not verified');
     }
 
     // Проверяем пароль

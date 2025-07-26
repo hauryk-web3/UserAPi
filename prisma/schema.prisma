@@ -15,4 +15,5 @@ model User {
   lastname  String
   createdAt DateTime @default(now())
   emailVerified  Boolean  @default(false)
+  refreshToken   String?
 }

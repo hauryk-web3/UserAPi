@@ -6,6 +6,7 @@ import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { VerificationService } from './verification.service';
+import { Request, Response } from 'express';
 
 @Injectable()
 export class AuthService {
@@ -51,8 +52,40 @@ export class AuthService {
     };
   }
 
+  async logout(req: Request, res: Response) {
+    const refreshToken = req.cookies['refresh_token'];
+
+    if (!refreshToken) {
+      throw new UnauthorizedException('No refresh token');
+    }
+
+    // Ищем пользователя по refresh токену
+    const user = await this.prisma.user.findFirst({
+      where: { refreshToken },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    // Удаляем токен из базы
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { refreshToken: null },
+    });
+
+    // Удаляем куку на клиенте
+    res.clearCookie('refresh_token', {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
+    });
+
+    return { message: 'Logged out successfully' };
+  }
+
   // Логин
-  async login(dto: LoginDto) {
+  async login(dto: LoginDto, res: Response) {
     // Ищем пользователя по email
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
@@ -77,8 +110,76 @@ export class AuthService {
     const payload = { sub: user.id, email: user.email };
 
     // Генерируем токен
-    const token = this.jwtService.sign(payload);
+    const accessToken = this.jwtService.sign(payload, {
+      expiresIn: '15m',
+    });
 
-    return { access_token: token };
+    const refreshToken = this.jwtService.sign(payload, {
+      expiresIn: '7d',
+    });
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { refreshToken },
+    });
+
+    res.cookie('refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return { access_token: accessToken };
+  }
+
+  async refresh(req: Request, res: Response) {
+    const refreshToken = req.cookies['refresh_token'];
+
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token not found');
+    }
+
+    let payload: any;
+    try {
+      payload = await this.jwtService.verifyAsync(refreshToken);
+    } catch (e) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+    });
+
+    if (!user || user.refreshToken !== refreshToken) {
+      throw new UnauthorizedException('Refresh token mismatch');
+    }
+
+    const newPayload = {
+      sub: user.id,
+      email: user.email,
+    };
+
+    const newAccessToken = this.jwtService.sign(newPayload, {
+      expiresIn: '15m',
+    });
+
+    const newRefreshToken = this.jwtService.sign(newPayload, {
+      expiresIn: '7d',
+    });
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { refreshToken: newRefreshToken },
+    });
+
+    res.cookie('refresh_token', newRefreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 дней
+    });
+
+    return { access_token: newAccessToken };
   }
 }

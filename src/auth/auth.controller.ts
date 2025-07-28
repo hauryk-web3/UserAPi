@@ -1,9 +1,10 @@
-import { Body, Controller, Post, BadRequestException, HttpCode, Res, Req} from '@nestjs/common';
+import { Body, Controller, Post, BadRequestException, HttpCode, Res, Req, Get, UseGuards} from '@nestjs/common';
 import { RegisterDto } from './dto/register.dto';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { VerificationService } from './verification.service';
 import { Request, Response } from 'express';
+import { AuthGuard } from '@nestjs/passport';
 
 @Controller('auth')
 export class AuthController {
@@ -59,5 +60,27 @@ export class AuthController {
   @HttpCode(200)
   Refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     return this.authService.refresh(req, res);
+  }
+
+  @Get('me')
+  @HttpCode(200)
+  Me(@Req() req: Request) {
+    return this.authService.me(req);
+  }
+
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  async googleAuth() {
+    // Просто редиректит на Google
+  }
+
+  @Get('google/redirect')
+  @UseGuards(AuthGuard('google'))
+  async googleAuthRedirect(@Req() req, @Res({ passthrough: true }) res: Response) {
+    const user = req.user;
+
+    const tokens = await this.authService.loginWithOAuth(user, res);
+    
+    res.redirect(`http://localhost:5173/oauth/callback?access_token=${tokens.access_token}`);
   }
 }

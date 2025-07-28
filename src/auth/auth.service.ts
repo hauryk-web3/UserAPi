@@ -99,6 +99,10 @@ export class AuthService {
       throw new UnauthorizedException('Email not verified');
     }
 
+    if (!user || !user.password) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
     // Проверяем пароль
     const isMatch = await bcrypt.compare(dto.password, user.password);
 
@@ -181,5 +185,73 @@ export class AuthService {
     });
 
     return { access_token: newAccessToken };
+  }
+
+  async me(req: Request) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      throw new UnauthorizedException('Missing or malformed token');
+    }
+
+    const accessToken = authHeader.replace('Bearer ', '');
+
+    let payload: any;
+    try {
+      payload = this.jwtService.verify(accessToken);
+    } catch (err) {
+      throw new UnauthorizedException('Invalid token');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      firstname: user.firstname,
+      lastname: user.lastname,
+    };
+  }
+
+  async loginWithOAuth(userData: { email: string; firstName: string; lastName: string }, res: Response) {
+    let user = await this.prisma.user.findUnique({
+      where: { email: userData.email },
+    });
+
+    if (!user) {
+      user = await this.prisma.user.create({
+        data: {
+          email: userData.email,
+          firstname: userData.firstName,
+          lastname: userData.lastName,
+          emailVerified: true,
+          // provider: 'google',
+        },
+      });
+    }
+
+    const payload = { sub: user.id, email: user.email };
+
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
+    const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { refreshToken },
+    });
+
+    res.cookie('refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return { access_token: accessToken };
   }
 }

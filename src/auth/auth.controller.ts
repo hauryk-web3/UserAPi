@@ -68,6 +68,12 @@ export class AuthController {
     return this.authService.me(req);
   }
 
+  @Post('forgot-password')
+  @HttpCode(200)
+  ForgotPassword(@Body() body: { email: string }) {
+    return this.authService.forgotPassword(body.email);
+  }
+
   @Get('google')
   @UseGuards(AuthGuard('google'))
   async googleAuth() {
@@ -80,7 +86,7 @@ export class AuthController {
     const user = req.user;
 
     const tokens = await this.authService.loginWithOAuth(user, res);
-    
+
     res.redirect(`http://localhost:5173/oauth/callback?access_token=${tokens.access_token}`);
   }
 }

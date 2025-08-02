@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
 import Redis from 'ioredis';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class VerificationService {
@@ -52,7 +53,25 @@ export class VerificationService {
     await this.sendVerificationCode(email);
   }
 
+  async sendPasswordResetLink(email: string): Promise<void> {
+    const token = uuidv4();
+
+    await this.redis.set(`reset-password-token:${token}`, email, 'EX', 15 * 60);
+
+    const resetUrl = `${process.env.FRONT_URL}/reset-password?token=${token}`;
+
+    await this.mailerService.sendMail({
+      to: email,
+      subject: 'Сброс пароля',
+      template: 'reset-password-link',
+      text: `Сброс пароля: ${resetUrl}`,
+      context: {
+        resetUrl,
+      },
+    });
+  }
+
   private generateCode(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString(); // 6-значный код
+    return Math.floor(100000 + Math.random() * 900000).toString();
   }
 }

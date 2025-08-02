@@ -254,4 +254,20 @@ export class AuthService {
 
     return { access_token: accessToken };
   }
+
+  async forgotPassword(email: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email: email },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    await this.verificationService.sendPasswordResetLink(email);
+
+    return {
+      success: true,
+    };
+  }
 }

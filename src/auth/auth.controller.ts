@@ -1,5 +1,6 @@
 import { Body, Controller, Post, BadRequestException, HttpCode, Res, Req, Get, UseGuards} from '@nestjs/common';
 import { RegisterDto } from './dto/register.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { VerificationService } from './verification.service';
@@ -72,6 +73,12 @@ export class AuthController {
   @HttpCode(200)
   ForgotPassword(@Body() body: { email: string }) {
     return this.authService.forgotPassword(body.email);
+  }
+
+  @Post('reset-password')
+  @HttpCode(200)
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto.token, dto.newPassword);
   }
 
   @Get('google')

@@ -1,5 +1,5 @@
 // src/auth/auth.service.ts
-import { Injectable, ConflictException, UnauthorizedException } from '@nestjs/common';
+import { Injectable, ConflictException, UnauthorizedException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -7,6 +7,8 @@ import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { VerificationService } from './verification.service';
 import { Request, Response } from 'express';
+import Redis from 'ioredis';
+import { Inject } from '@nestjs/common';
 
 @Injectable()
 export class AuthService {
@@ -14,6 +16,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private readonly verificationService: VerificationService,
+    @Inject('REDIS_CLIENT') private readonly redis: Redis,
   ) {}
 
   // Регистрация
@@ -268,6 +271,41 @@ export class AuthService {
 
     return {
       success: true,
+    };
+  }
+
+  async resetPassword(token: string, password: string) {
+    if (!password || password.length < 8) {
+      throw new BadRequestException('Неверный формат пароля');
+    }
+
+    const userEmail = await this.verificationService.verifyPasswordToken(token);
+
+    if (!userEmail) {
+      throw new UnauthorizedException('Неверный или просроченный токен');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { email: userEmail },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Пользователь не найден');
+    }
+
+    const hash = await bcrypt.hash(password, 10);
+
+    await this.prisma.user.update({
+      where: { email: userEmail },
+      data: { password: hash },
+    });
+
+    // ← удаляем токен после успешного сброса
+    await this.redis.del(`reset-password-token:${token}`);
+
+    return {
+      success: true,
+      message: 'Пароль успешно обновлён',
     };
   }
 }

@@ -71,6 +71,16 @@ export class VerificationService {
     });
   }
 
+  async verifyPasswordToken(token: string): Promise<string | null> {
+    const storedEmail = await this.redis.get(`reset-password-token:${token}`);
+
+    if (!storedEmail) {
+      return null;
+    }
+
+    return storedEmail;
+  }
+
   private generateCode(): string {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }

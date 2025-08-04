@@ -1,7 +1,6 @@
 // src/redis/redis.module.ts
 import { Module, Global } from '@nestjs/common';
 import Redis from 'ioredis';
-import { RedisTestService } from './redis-test.service';
 
 @Global()
 @Module({
@@ -9,11 +8,13 @@ import { RedisTestService } from './redis-test.service';
     {
       provide: 'REDIS_CLIENT',
       useFactory: async () => {
-        return new Redis({ host: 'localhost', port: 6379 });
+        const host = process.env.REDIS_HOST || 'localhost';
+        const port = Number(process.env.REDIS_PORT) || 6379;
+        return new Redis({ host, port });
       },
     },
-    RedisTestService, // ← добавляем сервис
   ],
   exports: ['REDIS_CLIENT'],
 })
 export class RedisModule {}
+
